@@ -1,0 +1,17 @@
+{
+  "version": "0.0.1",
+  "configurations": [
+    {
+      "name": "dev",
+      "runtimeExecutable": "bash",
+      "runtimeArgs": ["-lc", "source ~/.nvm/nvm.sh && nvm use >/dev/null && npm run dev -- --port 3000"],
+      "port": 3000
+    },
+    {
+      "name": "ui-preview",
+      "runtimeExecutable": "bash",
+      "runtimeArgs": ["-lc", "source ~/.nvm/nvm.sh && nvm use >/dev/null && NUXT_PUBLIC_SUPABASE_URL=http://127.0.0.1:54321 NUXT_PUBLIC_SUPABASE_KEY=preview NUXT_PUBLIC_SUPABASE_REDIRECT_OPTIONS_EXCLUDE='[\"/*\"]' npm run dev -- --port 3001"],
+      "port": 3001
+    }
+  ]
+}
