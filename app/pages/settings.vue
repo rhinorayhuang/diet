@@ -23,9 +23,52 @@ function targetKcal(id: string) {
   return m && w ? dailyTargets(m, w, taipeiNow().date).kcal : null
 }
 
-// TODO: 從 settings 資料表讀寫
+const toast = useToast()
+
+// AI 模型存在家庭設定，兩支手機共用
 const model = ref<AiModel>(DEFAULT_AI_MODEL)
 const modelItems = Object.entries(AI_MODEL_LABELS).map(([value, label]) => ({ value, label }))
+const householdId = ref<string | null>(null)
+
+async function loadModel() {
+  const { data, error } = await supabase.from('households').select('id, ai_model').single()
+  if (error) {
+    toast.add({ title: '讀取設定失敗', description: errorMessage(error), color: 'error' })
+    return
+  }
+  householdId.value = data.id
+  model.value = data.ai_model as AiModel
+}
+
+async function changeModel(value: AiModel) {
+  const previous = model.value
+  model.value = value
+  const { error } = await supabase.from('households').update({ ai_model: value }).eq('id', householdId.value!)
+  if (error) {
+    model.value = previous
+    toast.add({ title: '儲存失敗', description: errorMessage(error), color: 'error' })
+    return
+  }
+  toast.add({ title: `已改用 ${AI_MODEL_LABELS[value]}`, color: 'success' })
+}
+
+// 本月（台灣時間）預估 API 花費
+const cost = ref<{ usd: number, calls: number } | null>(null)
+
+async function loadCost() {
+  const monthStart = `${taipeiNow().date.slice(0, 7)}-01T00:00:00+08:00`
+  const { data, error } = await supabase
+    .from('ai_usage_logs')
+    .select('cost_usd')
+    .gte('created_at', monthStart)
+  if (error) {
+    toast.add({ title: '讀取花費失敗', description: errorMessage(error), color: 'error' })
+    return
+  }
+  cost.value = { usd: data.reduce((sum, r) => sum + Number(r.cost_usd), 0), calls: data.length }
+}
+
+onMounted(() => Promise.all([loadModel(), loadCost()]))
 
 async function signOut() {
   await supabase.auth.signOut()
@@ -91,12 +134,22 @@ async function signOut() {
 
     <UCard>
       <template #header>AI 模型</template>
-      <USelect v-model="model" :items="modelItems" class="w-full" />
+      <USelect
+        :model-value="model"
+        :items="modelItems"
+        :disabled="!householdId"
+        class="w-full"
+        @update:model-value="changeModel($event as AiModel)"
+      />
+      <p class="mt-2 text-xs text-muted">Sonnet 5.5 兼顧準確與費用；Opus 5.5 較準但約貴一倍；Haiku 5.5 最便宜。</p>
     </UCard>
 
     <UCard>
       <template #header>本月預估 API 花費</template>
-      <p class="text-2xl font-semibold tabular-nums">US$ —</p>
+      <p class="text-2xl font-semibold tabular-nums">
+        US$ {{ cost ? cost.usd.toFixed(cost.usd < 1 ? 3 : 2) : '—' }}
+      </p>
+      <p v-if="cost" class="text-xs text-muted tabular-nums">共 {{ cost.calls }} 次 AI 呼叫，依官方定價估算</p>
     </UCard>
 
     <UButton block color="neutral" variant="outline" icon="i-lucide-log-out" @click="signOut">

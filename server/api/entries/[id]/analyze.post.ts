@@ -2,7 +2,7 @@ import { Buffer } from 'node:buffer'
 import { useAiProvider } from '../../../utils/ai'
 import type { MealImage } from '../../../utils/ai/provider'
 
-// 對一筆記錄執行 AI 辨識（PRD 3.5.2–3.5.5）。結果回傳給前端確認，確認後才寫入品項
+// 對一筆記錄執行 AI 辨識（PRD 3.5.2–3.5.5）。品項先以「待確認」存入，使用者確認後才計入當日攝取
 export default defineEventHandler(async (event) => {
   const id = getRouterParam(event, 'id')!
   const { client, model, logUsage } = await useHouseholdContext(event)
@@ -38,6 +38,22 @@ export default defineEventHandler(async (event) => {
       dietNote: member?.diet_note,
     })
     await logUsage('recognize', usage)
+
+    // 先存成待確認的品項，離開確認畫面再回來時不必重新分析
+    await client.from('entry_items').delete().eq('entry_id', id)
+    if (items.length) {
+      const { error: insError } = await client.from('entry_items').insert(items.map((item, i) => ({
+        entry_id: id,
+        name: item.name,
+        portion: item.portion,
+        kcal: item.kcal,
+        protein_g: item.proteinG,
+        carbs_g: item.carbsG,
+        fat_g: item.fatG,
+        sort_order: i,
+      })))
+      if (insError) throw insError
+    }
     await client.from('entries').update({ status: 'pending' }).eq('id', id)
     return { items }
   }

@@ -1,13 +1,18 @@
 <script setup lang="ts">
-import { ENTRY_STATUS_LABELS, MEAL_LABELS, type Entry, type MealType } from '#shared/types/domain'
+import {
+  ENTRY_STATUS_LABELS, MEAL_LABELS, type DailySummary, type Entry, type MealType,
+} from '#shared/types/domain'
 
-// TODO: 每日總結
 const date = useState('today-date', () => taipeiNow().date)
 
 const { ensureLoaded, activeMembers, latestWeight, loaded } = useMembers()
 const { memberId, setDefaultMember } = useCurrentMember()
-const { listForDay, photoUrls } = useEntries()
+const { listForDay, photoUrls, retryFailed } = useEntries()
+const { getSummary, generateSummary } = useSummaries()
 const toast = useToast()
+
+// 每次打開 App 只自動重試一次
+const autoRetried = useState('auto-retried', () => false)
 
 onMounted(async () => {
   await ensureLoaded()
@@ -15,13 +20,16 @@ onMounted(async () => {
   if (!activeMembers.value.some(m => m.id === memberId.value)) {
     setDefaultMember(activeMembers.value[0]?.id ?? null)
   }
+  if (!autoRetried.value && memberId.value) {
+    autoRetried.value = true
+    const count = await retryFailed(memberId.value).catch(() => 0)
+    if (count) {
+      toast.add({ title: `已重新分析 ${count} 筆失敗的記錄，請確認`, color: 'info' })
+      await loadEntries()
+    }
+  }
 })
 
-const memberItems = computed(() => activeMembers.value.map(m => ({ value: m.id, label: m.name })))
-const selectedMemberId = computed({
-  get: () => memberId.value ?? undefined,
-  set: (id?: string) => setDefaultMember(id ?? null),
-})
 const currentMember = computed(() => activeMembers.value.find(m => m.id === memberId.value))
 const targets = computed(() => {
   const m = currentMember.value
@@ -56,6 +64,41 @@ async function loadEntries() {
   }
 }
 watch([() => currentMember.value?.id, date], loadEntries, { immediate: true })
+
+// ───── 每日總結 ─────
+const summary = ref<DailySummary | null>(null)
+const summarizing = ref(false)
+
+async function loadSummary() {
+  const m = currentMember.value
+  summary.value = null
+  if (!m) return
+  try {
+    summary.value = await getSummary(m.id, date.value)
+  }
+  catch (e) {
+    toast.add({ title: '讀取總結失敗', description: errorMessage(e), color: 'error' })
+  }
+}
+// 記錄變動會讓資料庫把總結標成過期，所以記錄重新讀取後也重讀總結
+watch(entries, loadSummary)
+
+async function summarize() {
+  const m = currentMember.value
+  if (!m) return
+  summarizing.value = true
+  try {
+    summary.value = await generateSummary(m.id, date.value)
+  }
+  catch (e) {
+    toast.add({ title: '產生總結失敗', description: errorMessage(e), color: 'error' })
+  }
+  finally {
+    summarizing.value = false
+  }
+}
+
+const hasReadyEntries = computed(() => entries.value.some(e => e.status === 'ready'))
 
 const mealTypes = Object.keys(MEAL_LABELS) as MealType[]
 const entriesByMeal = computed(() =>
@@ -99,14 +142,7 @@ const addMenu = [[
 <template>
   <div class="space-y-4">
     <header class="flex items-center justify-between">
-      <USelect
-        v-if="memberItems.length"
-        v-model="selectedMemberId"
-        :items="memberItems"
-        variant="ghost"
-        class="min-w-28 font-medium"
-      />
-      <span v-else />
+      <MemberSwitcher />
       <div class="flex items-center gap-1">
         <UButton color="neutral" variant="ghost" icon="i-lucide-chevron-left" aria-label="前一天" @click="date = addDays(date, -1)" />
         <span class="text-sm tabular-nums">{{ date }}</span>
@@ -145,7 +181,7 @@ const addMenu = [[
     <section v-for="type in mealTypes" :key="type" class="space-y-2">
       <h2 class="flex justify-between text-sm font-medium text-muted">
         <span>{{ MEAL_LABELS[type] }}</span>
-        <span v-if="entriesByMeal[type].length" class="tabular-nums">
+        <span v-if="entriesByMeal[type].some(e => e.status === 'ready')" class="tabular-nums">
           {{ Math.round(sumNutrients(entriesByMeal[type].filter(e => e.status === 'ready').flatMap(e => e.items)).kcal) }} kcal
         </span>
       </h2>
@@ -184,9 +220,34 @@ const addMenu = [[
       </NuxtLink>
     </section>
 
-    <UButton block size="lg" variant="soft" icon="i-lucide-sparkles">
-      產生今日總結
+    <UCard v-if="summary">
+      <template #header>
+        <div class="flex items-center justify-between gap-2">
+          <span class="flex items-center gap-1.5 font-medium">
+            <UIcon name="i-lucide-sparkles" class="size-4 text-primary" />
+            每日總結
+          </span>
+          <UBadge v-if="summary.isStale" color="warning" variant="subtle" size="sm">記錄已變動</UBadge>
+        </div>
+      </template>
+      <p class="text-sm leading-relaxed whitespace-pre-line">{{ summary.content }}</p>
+    </UCard>
+
+    <UButton
+      v-if="currentMember"
+      block
+      size="lg"
+      variant="soft"
+      icon="i-lucide-sparkles"
+      :loading="summarizing"
+      :disabled="!hasReadyEntries"
+      @click="summarize"
+    >
+      {{ summarizing ? 'AI 撰寫中…' : summary ? '重新產生總結' : '產生今日總結' }}
     </UButton>
+    <p v-if="currentMember && !hasReadyEntries && !entriesLoading" class="-mt-2 text-center text-xs text-dimmed">
+      確認至少一筆記錄後就能產生總結
+    </p>
 
     <UDropdownMenu v-if="currentMember" :items="addMenu" :content="{ side: 'top', align: 'end' }">
       <UButton

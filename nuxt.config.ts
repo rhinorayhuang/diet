@@ -20,7 +20,10 @@ export default defineNuxtConfig({
         { name: 'apple-mobile-web-app-status-bar-style', content: 'default' },
         { name: 'theme-color', content: '#16a34a' },
       ],
-      link: [{ rel: 'icon', type: 'image/svg+xml', href: '/icon.svg' }],
+      link: [
+        { rel: 'icon', type: 'image/svg+xml', href: '/icon.svg' },
+        { rel: 'apple-touch-icon', href: '/apple-touch-icon.png' },
+      ],
     },
   },
 
@@ -55,6 +58,9 @@ export default defineNuxtConfig({
       theme_color: '#16a34a',
       background_color: '#ffffff',
       icons: [
+        { src: '/pwa-192.png', sizes: '192x192', type: 'image/png', purpose: 'any' },
+        { src: '/pwa-512.png', sizes: '512x512', type: 'image/png', purpose: 'any' },
+        { src: '/maskable-512.png', sizes: '512x512', type: 'image/png', purpose: 'maskable' },
         { src: '/icon.svg', sizes: 'any', type: 'image/svg+xml', purpose: 'any' },
       ],
     },

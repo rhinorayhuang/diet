@@ -33,7 +33,9 @@ const SUMMARY_SYSTEM = `你是一位友善的營養師，為使用者撰寫當�
 - 使用繁體中文，口吻友善、不說教。
 - 內容依序包含：當日攝取和目標的比較（熱量、蛋白質、碳水、脂肪）、飲食評語（優點與可改善之處）、明天的具體建議。
 - 參考最近 7 天的攝取與體重趨勢，但重點放在當天。
-- 篇幅控制在手機一個畫面內（約 200–300 字），不要使用表格。`
+- 篇幅控制在手機一個畫面內（約 200–300 字）。
+- 畫面只顯示純文字：不要使用 Markdown（#、**、表格等），以空行分段、「・」列點，可以用少量 emoji。
+- 不要寫標題或日期，直接開始內容。`
 
 function toItem(raw: RawItem): RecognizedItem {
   return {
@@ -129,6 +131,7 @@ export function createClaudeProvider(apiKey: string, model: AiModel): AiProvider
         .filter((b): b is Anthropic.Beta.BetaTextBlock => b.type === 'text')
         .map(b => b.text)
         .join('\n')
+        .trim()
       return { text, usage: usageOf(message) }
     },
   }

@@ -43,6 +43,41 @@ export function useEntries() {
     return hydrate(data)
   }
 
+  /** from、to 皆包含 */
+  async function listRange(memberId: string, from: string, to: string): Promise<Entry[]> {
+    const { data, error } = await supabase
+      .from('entries')
+      .select('*')
+      .eq('member_id', memberId)
+      .gte('date', from)
+      .lte('date', to)
+      .order('created_at')
+    if (error) throw error
+    return hydrate(data)
+  }
+
+  /** PRD 3.5.5：打開 App 時，把最近 7 天分析失敗的記錄重新送 AI，回傳成功筆數 */
+  async function retryFailed(memberId: string): Promise<number> {
+    const { data, error } = await supabase
+      .from('entries')
+      .select('id')
+      .eq('member_id', memberId)
+      .eq('status', 'failed')
+      .gte('date', addDays(taipeiNow().date, -6))
+    if (error) throw error
+    let succeeded = 0
+    for (const { id } of data) {
+      try {
+        await analyze(id)
+        succeeded++
+      }
+      catch {
+        // 仍然失敗就維持原狀，下次再試
+      }
+    }
+    return succeeded
+  }
+
   async function getEntry(id: string): Promise<Entry | null> {
     const { data, error } = await supabase.from('entries').select('*').eq('id', id).maybeSingle()
     if (error) throw error
@@ -133,5 +168,7 @@ export function useEntries() {
     })
   }
 
-  return { listForDay, getEntry, createEntry, confirmEntry, deleteEntry, photoUrls, analyze, reestimate }
+  return {
+    listForDay, listRange, retryFailed, getEntry, createEntry, confirmEntry, deleteEntry, photoUrls, analyze, reestimate,
+  }
 }

@@ -26,11 +26,6 @@ const analyzing = ref(false)
 const analyzeError = ref('')
 const saving = ref(false)
 
-function errorMessage(e: unknown) {
-  const err = e as { data?: { statusMessage?: string }, statusMessage?: string, message?: string }
-  return err?.data?.statusMessage ?? err?.statusMessage ?? err?.message ?? String(e)
-}
-
 function toEditable(item: FoodItem): EditableItem {
   return {
     key: nextKey++,
@@ -84,17 +79,9 @@ onMounted(async () => {
   if (entry.value.status !== 'ready' && items.value.length === 0) await runAnalyze()
 })
 
-const totals = computed(() => {
-  const t = sumNutrients(items.value.map(i => ({
-    kcal: i.kcal || 0, proteinG: i.proteinG || 0, carbsG: i.carbsG || 0, fatG: i.fatG || 0,
-  })))
-  return {
-    kcal: Math.round(t.kcal),
-    proteinG: Math.round(t.proteinG),
-    carbsG: Math.round(t.carbsG),
-    fatG: Math.round(t.fatG),
-  }
-})
+const totals = computed(() => roundNutrients(sumNutrients(items.value.map(i => ({
+  kcal: i.kcal || 0, proteinG: i.proteinG || 0, carbsG: i.carbsG || 0, fatG: i.fatG || 0,
+})))))
 
 function addItem() {
   items.value.push(toEditable({ name: '', portion: '', kcal: 0, proteinG: 0, carbsG: 0, fatG: 0 }))

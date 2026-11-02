@@ -1,7 +1,7 @@
 // Supabase 資料列（snake_case）與領域型別（camelCase）之間的轉換
 import type { Database } from '#shared/types/database.types'
 import type {
-  ActivityLevel, Entry, EntryItem, EntryStatus, Goal, MealType, Member, Sex, WeightLog,
+  ActivityLevel, DailySummary, Entry, EntryItem, EntryStatus, Goal, MealType, Member, Sex, WeightLog,
 } from '#shared/types/domain'
 
 export type MemberInput = Omit<Member, 'id' | 'householdId' | 'archivedAt'>
@@ -74,5 +74,16 @@ export function toWeightLog(row: Tables['weight_logs']['Row']): WeightLog {
     memberId: row.member_id,
     date: row.date,
     weightKg: Number(row.weight_kg),
+  }
+}
+
+export function toDailySummary(row: Tables['daily_summaries']['Row']): DailySummary {
+  return {
+    id: row.id,
+    memberId: row.member_id,
+    date: row.date,
+    content: row.content,
+    generatedAt: row.generated_at,
+    isStale: row.is_stale,
   }
 }

@@ -35,4 +35,19 @@ npm run dev
 2. Supabase → Authentication → Providers：關閉「Allow new users to sign up」。
 3. Supabase → Authentication → Users：新增家庭帳號（Email + 密碼）。建立帳號時會自動建立家庭資料。
 4. 在 Anthropic Console 建立 API key，並設定每月花費上限。
-5. 在 Vercel 匯入專案，設定 `.env.example` 中的三個環境變數。
+5. 部署到 Vercel（見下一節）。
+
+## 部署到 Vercel
+
+Vercel 會自動偵測 Nuxt，不需要額外設定；Node 版本由 `package.json` 的 `engines` 指定為 22。
+
+1. 到 [vercel.com/new](https://vercel.com/new) 用 GitHub 登入，匯入 `rhinorayhuang/diet`。
+2. Framework Preset 保持 **Nuxt.js**，Build／Output 設定都用預設值。
+3. 在 **Environment Variables** 加入三個變數（值和本機 `.env` 相同）：
+   - `NUXT_PUBLIC_SUPABASE_URL`
+   - `NUXT_PUBLIC_SUPABASE_KEY`
+   - `NUXT_ANTHROPIC_API_KEY`
+4. 按 **Deploy**。之後每次推到 `main` 都會自動重新部署。
+5. （選用）Supabase → Authentication → URL Configuration：把 **Site URL** 改成 Vercel 網址，日後使用密碼重設信件時才會導回正確網址。
+
+部署完成後用手機開啟網址並登入，在 Safari「分享 → 加入主畫面」（iOS）或 Chrome「安裝應用程式」（Android）即可當成 App 使用。

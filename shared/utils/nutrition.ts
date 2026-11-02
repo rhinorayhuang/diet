@@ -66,3 +66,12 @@ export function sumNutrients(list: Nutrients[]): Nutrients {
     { kcal: 0, proteinG: 0, carbsG: 0, fatG: 0 },
   )
 }
+
+export function roundNutrients(n: Nutrients): Nutrients {
+  return {
+    kcal: Math.round(n.kcal),
+    proteinG: Math.round(n.proteinG),
+    carbsG: Math.round(n.carbsG),
+    fatG: Math.round(n.fatG),
+  }
+}
