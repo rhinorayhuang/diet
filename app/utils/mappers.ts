@@ -1,6 +1,8 @@
 // Supabase 資料列（snake_case）與領域型別（camelCase）之間的轉換
 import type { Database } from '#shared/types/database.types'
-import type { ActivityLevel, Goal, Member, Sex, WeightLog } from '#shared/types/domain'
+import type {
+  ActivityLevel, Entry, EntryItem, EntryStatus, Goal, MealType, Member, Sex, WeightLog,
+} from '#shared/types/domain'
 
 export type MemberInput = Omit<Member, 'id' | 'householdId' | 'archivedAt'>
 
@@ -32,6 +34,37 @@ export function fromMemberInput(input: MemberInput): Tables['members']['Insert']
     goal: input.goal,
     diet_note: input.dietNote,
     calorie_target_override: input.calorieTargetOverride,
+  }
+}
+
+export function toEntryItem(row: Tables['entry_items']['Row']): EntryItem {
+  return {
+    id: row.id,
+    entryId: row.entry_id,
+    name: row.name,
+    portion: row.portion,
+    kcal: row.kcal,
+    proteinG: Number(row.protein_g),
+    carbsG: Number(row.carbs_g),
+    fatG: Number(row.fat_g),
+    sortOrder: row.sort_order,
+  }
+}
+
+export function toEntry(
+  row: Tables['entries']['Row'],
+  items: EntryItem[],
+  photoPaths: string[],
+): Entry {
+  return {
+    id: row.id,
+    memberId: row.member_id,
+    date: row.date,
+    mealType: row.meal_type as MealType,
+    note: row.note,
+    status: row.status as EntryStatus,
+    items,
+    photoPaths,
   }
 }
 

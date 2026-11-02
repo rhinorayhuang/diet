@@ -1,10 +1,7 @@
 // AI 供應商介面（PRD 第 6 節）：日後可替換成 Ollama 等其他實作
-import type { AiModel, MealType, Nutrients } from '#shared/types/domain'
+import type { AiModel, FoodItem, MealType, Nutrients } from '#shared/types/domain'
 
-export interface RecognizedItem extends Nutrients {
-  name: string
-  portion: string
-}
+export type RecognizedItem = FoodItem
 
 export interface AiUsage {
   model: AiModel

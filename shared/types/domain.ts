@@ -37,13 +37,27 @@ export interface Nutrients {
   fatG: number
 }
 
-export interface EntryItem extends Nutrients {
-  id: string
-  entryId: string
+/** 一個食物品項（AI 辨識結果或使用者編輯中的內容） */
+export interface FoodItem extends Nutrients {
   name: string
   portion: string
+}
+
+export interface EntryItem extends FoodItem {
+  id: string
+  entryId: string
   sortOrder: number
 }
+
+export const ENTRY_STATUS_LABELS: Record<EntryStatus, string> = {
+  pending: '待確認',
+  analyzing: '分析中',
+  ready: '已確認',
+  failed: '分析失敗',
+}
+
+/** PRD 3.5.2 */
+export const MAX_PHOTOS_PER_ENTRY = 3
 
 export interface Entry {
   id: string
