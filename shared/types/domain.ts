@@ -19,6 +19,10 @@ export interface Member {
   goal: Goal
   dietNote: string | null
   calorieTargetOverride: number | null
+  /** 實測基礎代謝（例如 InBody），有填就取代公式估算 */
+  measuredBmr: number | null
+  /** 體脂率（%），有填就用去脂體重算蛋白質 */
+  bodyFatPct: number | null
   archivedAt: string | null
 }
 

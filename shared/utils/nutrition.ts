@@ -8,14 +8,26 @@ export const ACTIVITY_FACTORS: Record<ActivityLevel, number> = {
   active: 1.725,
 }
 
-export const GOAL_ADJUSTMENTS: Record<Goal, number> = {
-  lose: -500,
-  maintain: 0,
-  gain: 300,
+/** 每日熱量 = TDEE × 係數：減重抓 20% 缺口，增肌多 10% */
+export const GOAL_FACTORS: Record<Goal, number> = {
+  lose: 0.8,
+  maintain: 1,
+  gain: 1.1,
 }
 
-/** 熱量佔比：蛋白質／碳水／脂肪 */
-export const MACRO_RATIO = { protein: 0.25, carbs: 0.5, fat: 0.25 }
+/** 減重時每日熱量不低於這個值 */
+export const MIN_KCAL: Record<Sex, number> = { male: 1500, female: 1200 }
+
+/** 每公斤去脂體重的蛋白質克數 */
+export const PROTEIN_PER_KG_LEAN: Record<Goal, number> = {
+  lose: 2,
+  maintain: 1.6,
+  gain: 2,
+}
+
+/** 脂肪佔熱量比例；蛋白質最多佔這個比例；碳水為剩餘熱量 */
+export const FAT_RATIO = 0.28
+const MAX_PROTEIN_RATIO = 0.35
 
 const KCAL_PER_G = { protein: 4, carbs: 4, fat: 9 }
 
@@ -32,27 +44,66 @@ export function bmr(sex: Sex, weightKg: number, heightCm: number, age: number): 
   return sex === 'male' ? base + 5 : base - 161
 }
 
+/** Katch-McArdle：知道去脂體重時比 Mifflin 準 */
+export function bmrFromLeanMass(leanKg: number): number {
+  return 370 + 21.6 * leanKg
+}
+
+/** 去脂體重：有體脂率就直接換算，沒有就用 Boer 公式估計 */
+export function leanMass(sex: Sex, weightKg: number, heightCm: number, bodyFatPct: number | null): number {
+  if (bodyFatPct != null) return weightKg * (1 - bodyFatPct / 100)
+  return sex === 'male'
+    ? 0.407 * weightKg + 0.267 * heightCm - 19.2
+    : 0.252 * weightKg + 0.473 * heightCm - 48.3
+}
+
 export function tdee(bmrKcal: number, activity: ActivityLevel): number {
   return bmrKcal * ACTIVITY_FACTORS[activity]
 }
 
-export function macroTargets(kcal: number): Nutrients {
+/** 蛋白質依去脂體重決定，脂肪固定比例，碳水補足剩下的熱量 */
+export function macroTargets(kcal: number, leanKg: number, goal: Goal): Nutrients {
+  const proteinG = Math.min(leanKg * PROTEIN_PER_KG_LEAN[goal], (kcal * MAX_PROTEIN_RATIO) / KCAL_PER_G.protein)
+  const fatG = (kcal * FAT_RATIO) / KCAL_PER_G.fat
+  const carbsG = Math.max(0, (kcal - proteinG * KCAL_PER_G.protein - fatG * KCAL_PER_G.fat) / KCAL_PER_G.carbs)
+  return { kcal, proteinG: Math.round(proteinG), carbsG: Math.round(carbsG), fatG: Math.round(fatG) }
+}
+
+export type BmrSource = 'measured' | 'leanMass' | 'formula'
+
+export interface TargetBreakdown {
+  bmr: number
+  bmrSource: BmrSource
+  tdee: number
+  leanKg: number
+  /** 依目標算出的熱量（不含手動覆寫） */
+  autoKcal: number
+  targets: Nutrients
+}
+
+export function targetBreakdown(member: Member, latestWeightKg: number, onDate: string): TargetBreakdown {
+  const leanKg = leanMass(member.sex, latestWeightKg, member.heightCm, member.bodyFatPct)
+  const [bmrKcal, bmrSource]: [number, BmrSource] = member.measuredBmr != null
+    ? [member.measuredBmr, 'measured']
+    : member.bodyFatPct != null
+      ? [bmrFromLeanMass(leanKg), 'leanMass']
+      : [bmr(member.sex, latestWeightKg, member.heightCm, ageOn(member.birthYearMonth, onDate)), 'formula']
+  const tdeeKcal = tdee(bmrKcal, member.activityLevel)
+  let autoKcal = tdeeKcal * GOAL_FACTORS[member.goal]
+  if (member.goal === 'lose') autoKcal = Math.max(autoKcal, Math.min(MIN_KCAL[member.sex], tdeeKcal))
+  autoKcal = Math.round(autoKcal)
   return {
-    kcal,
-    proteinG: Math.round((kcal * MACRO_RATIO.protein) / KCAL_PER_G.protein),
-    carbsG: Math.round((kcal * MACRO_RATIO.carbs) / KCAL_PER_G.carbs),
-    fatG: Math.round((kcal * MACRO_RATIO.fat) / KCAL_PER_G.fat),
+    bmr: Math.round(bmrKcal),
+    bmrSource,
+    tdee: Math.round(tdeeKcal),
+    leanKg: Math.round(leanKg * 10) / 10,
+    autoKcal,
+    targets: macroTargets(member.calorieTargetOverride ?? autoKcal, leanKg, member.goal),
   }
 }
 
 export function dailyTargets(member: Member, latestWeightKg: number, onDate: string): Nutrients {
-  if (member.calorieTargetOverride != null) {
-    return macroTargets(member.calorieTargetOverride)
-  }
-  const age = ageOn(member.birthYearMonth, onDate)
-  const kcal = tdee(bmr(member.sex, latestWeightKg, member.heightCm, age), member.activityLevel)
-    + GOAL_ADJUSTMENTS[member.goal]
-  return macroTargets(Math.round(kcal))
+  return targetBreakdown(member, latestWeightKg, onDate).targets
 }
 
 export function sumNutrients(list: Nutrients[]): Nutrients {

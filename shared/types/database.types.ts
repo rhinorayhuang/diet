@@ -47,6 +47,8 @@ export type Database = {
         goal: string
         diet_note: string | null
         calorie_target_override: number | null
+        measured_bmr: number | null
+        body_fat_pct: number | null
         archived_at: string | null
         created_at: string
       }, 'name' | 'sex' | 'birth_year_month' | 'height_cm' | 'activity_level'>

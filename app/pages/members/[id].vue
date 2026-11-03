@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { z } from 'zod'
 import type { FormSubmitEvent } from '@nuxt/ui'
+import type { BmrSource } from '#shared/utils/nutrition'
 import {
   ACTIVITY_LABELS,
   GOAL_LABELS,
@@ -38,6 +39,8 @@ const schema = computed(() => z.object({
   goal: z.enum(['lose', 'maintain', 'gain']),
   dietNote: z.string().max(500, '最多 500 字'),
   calorieTargetOverride: z.number().int().min(800, '至少 800').max(6000, '最多 6000').optional(),
+  measuredBmr: z.number().int().min(500, '數值不合理').max(5000, '數值不合理').optional(),
+  bodyFatPct: z.number().gt(0, '數值不合理').lt(70, '數值不合理').optional(),
 }))
 
 const state = reactive({
@@ -50,6 +53,8 @@ const state = reactive({
   goal: 'maintain' as Goal,
   dietNote: '',
   calorieTargetOverride: undefined as number | undefined,
+  measuredBmr: undefined as number | undefined,
+  bodyFatPct: undefined as number | undefined,
 })
 
 function fillFrom(m: Member) {
@@ -62,6 +67,8 @@ function fillFrom(m: Member) {
     goal: m.goal,
     dietNote: m.dietNote ?? '',
     calorieTargetOverride: m.calorieTargetOverride ?? undefined,
+    measuredBmr: m.measuredBmr ?? undefined,
+    bodyFatPct: m.bodyFatPct ?? undefined,
   })
 }
 
@@ -79,16 +86,32 @@ onMounted(async () => {
   }
 })
 
-// 依目前表單內容預覽每日目標（自動計算值，不含手動覆寫）
-const autoTarget = computed(() => {
+// 依目前表單內容預覽每日目標的計算過程
+const breakdown = computed(() => {
   const weight = isNew.value ? state.weightKg : latestWeight(id.value)
   if (!state.heightCm || !weight || !/^\d{4}-\d{2}$/.test(state.birthYearMonth)) return null
-  return dailyTargets(
-    { ...state, calorieTargetOverride: null } as unknown as Member,
+  return targetBreakdown(
+    {
+      ...state,
+      calorieTargetOverride: state.calorieTargetOverride ?? null,
+      measuredBmr: state.measuredBmr ?? null,
+      bodyFatPct: state.bodyFatPct ?? null,
+    } as unknown as Member,
     weight,
     taipeiNow().date,
   )
 })
+
+const BMR_SOURCE_LABELS: Record<BmrSource, string> = {
+  measured: '實測',
+  leanMass: '依體脂估算',
+  formula: '依身高體重估算',
+}
+const GOAL_STEP_LABELS: Record<Goal, string> = {
+  lose: '減脂 −20%',
+  maintain: '維持',
+  gain: '增肌 +10%',
+}
 
 function showError(error: unknown) {
   toast.add({
@@ -111,6 +134,8 @@ async function onSubmit(event: FormSubmitEvent<z.output<typeof schema.value>>) {
     goal: d.goal,
     dietNote: d.dietNote.trim() || null,
     calorieTargetOverride: d.calorieTargetOverride ?? null,
+    measuredBmr: d.measuredBmr ?? null,
+    bodyFatPct: d.bodyFatPct ?? null,
   }
   saving.value = true
   try {
@@ -242,14 +267,42 @@ async function removeWeight(weightId: string) {
             <UTextarea v-model="state.dietNote" :rows="2" autoresize class="w-full" />
           </UFormField>
 
+          <div class="grid grid-cols-2 gap-3">
+            <UFormField label="實測 BMR（kcal）" name="measuredBmr" hint="選填">
+              <UInputNumber v-model="state.measuredBmr" :min="0" :step="10" :step-snapping="false" placeholder="例如 InBody" class="w-full" />
+            </UFormField>
+            <UFormField label="體脂率（%）" name="bodyFatPct" hint="選填">
+              <UInputNumber v-model="state.bodyFatPct" :min="0" :step="0.1" :step-snapping="false" class="w-full" />
+            </UFormField>
+          </div>
+          <p class="-mt-2 text-xs text-muted">
+            有體脂率時，蛋白質依去脂體重計算；有新的測量結果記得回來更新。
+          </p>
+
           <UFormField
             label="每日熱量目標（手動覆寫）"
             name="calorieTargetOverride"
             hint="選填"
-            :description="autoTarget ? `自動計算：${autoTarget.kcal} kcal（蛋白質 ${autoTarget.proteinG}g／碳水 ${autoTarget.carbsG}g／脂肪 ${autoTarget.fatG}g）` : '填完上面的資料後會顯示自動計算值'"
+            description="填寫後取代自動計算的熱量，三大營養素會依這個熱量重新分配"
           >
             <UInputNumber v-model="state.calorieTargetOverride" :min="0" :step="50" placeholder="留空使用自動計算" class="w-full" />
           </UFormField>
+
+          <div v-if="breakdown" class="rounded-md bg-elevated/50 p-3 text-sm space-y-1 tabular-nums">
+            <p class="text-muted">
+              BMR {{ breakdown.bmr }}（{{ BMR_SOURCE_LABELS[breakdown.bmrSource] }}）
+              × {{ ACTIVITY_FACTORS[state.activityLevel] }} = TDEE {{ breakdown.tdee }}
+              → {{ GOAL_STEP_LABELS[state.goal] }}：{{ breakdown.autoKcal }} kcal
+            </p>
+            <p class="font-medium">
+              每日目標 {{ breakdown.targets.kcal }} kcal{{ state.calorieTargetOverride ? '（手動覆寫）' : '' }}
+            </p>
+            <p class="text-muted">
+              蛋白質 {{ breakdown.targets.proteinG }}g（去脂體重 {{ breakdown.leanKg }} kg{{ state.bodyFatPct ? '' : '，估計值' }}）
+              ／碳水 {{ breakdown.targets.carbsG }}g／脂肪 {{ breakdown.targets.fatG }}g
+            </p>
+          </div>
+          <p v-else class="text-xs text-muted">填完上面的資料後會顯示每日目標</p>
 
           <UButton type="submit" block :loading="saving">{{ isNew ? '新增成員' : '儲存' }}</UButton>
         </UForm>

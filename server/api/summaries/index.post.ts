@@ -67,6 +67,8 @@ export default defineEventHandler(async (event) => {
         heightCm: member.heightCm,
         activityLevel: ACTIVITY_LABELS[member.activityLevel],
         goal: GOAL_LABELS[member.goal],
+        bodyFatPct: member.bodyFatPct,
+        measuredBmr: member.measuredBmr,
         dietNote: member.dietNote,
       },
       date,

@@ -20,6 +20,8 @@ export function toMember(row: Tables['members']['Row']): Member {
     goal: row.goal as Goal,
     dietNote: row.diet_note,
     calorieTargetOverride: row.calorie_target_override,
+    measuredBmr: row.measured_bmr,
+    bodyFatPct: row.body_fat_pct == null ? null : Number(row.body_fat_pct),
     archivedAt: row.archived_at,
   }
 }
@@ -34,6 +36,8 @@ export function fromMemberInput(input: MemberInput): Tables['members']['Insert']
     goal: input.goal,
     diet_note: input.dietNote,
     calorie_target_override: input.calorieTargetOverride,
+    measured_bmr: input.measuredBmr,
+    body_fat_pct: input.bodyFatPct,
   }
 }
 

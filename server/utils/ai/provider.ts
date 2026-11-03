@@ -35,6 +35,8 @@ export interface DailySummaryInput {
     heightCm: number
     activityLevel: string
     goal: string
+    bodyFatPct: number | null
+    measuredBmr: number | null
     dietNote: string | null
   }
   date: string
