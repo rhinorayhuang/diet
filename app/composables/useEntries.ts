@@ -123,6 +123,7 @@ export function useEntries() {
     if (items.length) {
       const { error: insError } = await supabase.from('entry_items').insert(items.map((item, i) => ({
         entry_id: id,
+        food_id: item.foodId ?? null,
         name: item.name,
         portion: item.portion,
         kcal: Math.round(item.kcal),

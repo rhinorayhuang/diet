@@ -8,6 +8,24 @@ type Table<Row, Required extends keyof Row> = {
   Relationships: []
 }
 
+type FoodRow = {
+  id: string
+  household_id: string | null
+  source: string
+  source_code: string | null
+  name: string
+  aliases: string | null
+  category: string | null
+  description: string | null
+  base_label: string
+  base_grams: number | null
+  kcal: number
+  protein_g: number
+  carbs_g: number
+  fat_g: number
+  created_at: string
+}
+
 export type Database = {
   public: {
     Tables: {
@@ -65,7 +83,16 @@ export type Database = {
         carbs_g: number
         fat_g: number
         sort_order: number
+        food_id: string | null
       }, 'entry_id' | 'name' | 'portion' | 'kcal' | 'protein_g' | 'carbs_g' | 'fat_g'>
+      foods: Table<FoodRow, 'source' | 'name' | 'base_label' | 'kcal' | 'protein_g' | 'carbs_g' | 'fat_g'>
+      food_portions: Table<{
+        id: string
+        food_id: string
+        household_id: string | null
+        label: string
+        grams: number
+      }, 'food_id' | 'label' | 'grams'>
       daily_summaries: Table<{
         id: string
         member_id: string
@@ -89,6 +116,20 @@ export type Database = {
     Functions: {
       current_household_id: { Args: Record<string, never>, Returns: string }
       is_household_member: { Args: { mid: string }, Returns: boolean }
+      search_foods: { Args: { q: string, max_results?: number }, Returns: FoodRow[] }
+      recent_foods: {
+        Args: { mid: string, max_results?: number }
+        Returns: {
+          food_id: string
+          name: string
+          portion: string
+          kcal: number
+          protein_g: number
+          carbs_g: number
+          fat_g: number
+          times: number
+        }[]
+      }
     }
     Enums: Record<string, never>
     CompositeTypes: Record<string, never>

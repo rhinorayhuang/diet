@@ -4,10 +4,12 @@ import {
 } from '#shared/types/domain'
 
 // PRD 3.5.4 確認畫面：AI 結果可新增、刪除、重新估算或直接改數字，確認後存檔
+// PRD 3.5.6 品項可以從食物庫替換，或存成常用食物
 const route = useRoute()
 const toast = useToast()
 const { getEntry, photoUrls, analyze, reestimate, confirmEntry, deleteEntry } = useEntries()
 const { ensureLoaded, getMember } = useMembers()
+const { createCustom } = useFoods()
 
 const id = computed(() => String(route.params.id))
 const entry = ref<Entry | null>(null)
@@ -29,6 +31,7 @@ const saving = ref(false)
 function toEditable(item: FoodItem): EditableItem {
   return {
     key: nextKey++,
+    foodId: item.foodId ?? null,
     name: item.name,
     portion: item.portion,
     kcal: item.kcal,
@@ -100,6 +103,7 @@ async function reestimateItem(item: EditableItem) {
   try {
     const { item: result } = await reestimate(entry.value.memberId, item.name, item.portion)
     Object.assign(item, {
+      foodId: null,
       kcal: result.kcal, proteinG: result.proteinG, carbsG: result.carbsG, fatG: result.fatG,
       portion: item.portion || result.portion,
     })
@@ -110,6 +114,61 @@ async function reestimateItem(item: EditableItem) {
   finally {
     item.reestimating = false
   }
+}
+
+// ───── 食物庫 ─────
+const pickerOpen = ref(false)
+const replacingKey = ref<number | null>(null)
+
+function openReplace(item: EditableItem) {
+  replacingKey.value = item.key
+  pickerOpen.value = true
+}
+
+function onPick(picked: FoodItem) {
+  const index = items.value.findIndex(i => i.key === replacingKey.value)
+  if (index >= 0) items.value[index] = toEditable(picked)
+  else items.value.push(toEditable(picked))
+  replacingKey.value = null
+}
+
+function openAddFromLibrary() {
+  replacingKey.value = null
+  pickerOpen.value = true
+}
+
+async function saveAsFood(item: EditableItem) {
+  const name = item.name.trim()
+  if (!name) {
+    toast.add({ title: '請先填寫品項名稱', color: 'warning' })
+    return
+  }
+  try {
+    const { label, grams } = splitPortion(item.portion)
+    const food = await createCustom({
+      name,
+      baseLabel: label || '1 份',
+      baseGrams: grams,
+      kcal: item.kcal || 0,
+      proteinG: item.proteinG || 0,
+      carbsG: item.carbsG || 0,
+      fatG: item.fatG || 0,
+    })
+    item.foodId = food.id
+    toast.add({ title: `已存成常用食物「${name}」`, color: 'success' })
+  }
+  catch (e) {
+    toast.add({ title: '儲存食物失敗', description: errorMessage(e), color: 'error' })
+  }
+}
+
+function itemMenu(item: EditableItem) {
+  return [[
+    { label: '從食物庫替換', icon: 'i-lucide-replace', onSelect: () => openReplace(item) },
+    ...(item.foodId ? [] : [{ label: '存成常用食物', icon: 'i-lucide-bookmark-plus', onSelect: () => saveAsFood(item) }]),
+  ], [
+    { label: '刪除品項', icon: 'i-lucide-trash-2', color: 'error' as const, onSelect: () => removeItem(item.key) },
+  ]]
 }
 
 async function save() {
@@ -199,8 +258,14 @@ async function remove() {
       <template v-if="!analyzing">
         <UCard v-for="item in items" :key="item.key" :ui="{ body: 'space-y-3' }">
           <div class="flex gap-2">
-            <UInput v-model="item.name" placeholder="品項名稱" class="flex-1" />
-            <UButton color="neutral" variant="ghost" icon="i-lucide-trash-2" aria-label="刪除品項" @click="removeItem(item.key)" />
+            <UInput v-model="item.name" placeholder="品項名稱" class="flex-1">
+              <template v-if="item.foodId" #trailing>
+                <UIcon name="i-lucide-book-open" class="size-4 text-primary" aria-label="來自食物庫" />
+              </template>
+            </UInput>
+            <UDropdownMenu :items="itemMenu(item)" :content="{ align: 'end' }">
+              <UButton color="neutral" variant="ghost" icon="i-lucide-ellipsis-vertical" aria-label="品項選項" />
+            </UDropdownMenu>
           </div>
           <div class="flex gap-2">
             <UInput v-model="item.portion" placeholder="份量，例如：半碗" class="flex-1" />
@@ -230,7 +295,16 @@ async function remove() {
           </div>
         </UCard>
 
-        <UButton block color="neutral" variant="outline" icon="i-lucide-plus" @click="addItem">新增品項</UButton>
+        <div class="grid grid-cols-2 gap-2">
+          <UButton block color="neutral" variant="outline" icon="i-lucide-book-open" @click="openAddFromLibrary">從食物庫加</UButton>
+          <UButton block color="neutral" variant="outline" icon="i-lucide-plus" @click="addItem">手動新增</UButton>
+        </div>
+        <FoodPicker
+          v-model:open="pickerOpen"
+          :member-id="entry.memberId"
+          :title="replacingKey === null ? '從食物庫加' : '從食物庫替換'"
+          @pick="onPick"
+        />
 
         <UCard>
           <div class="space-y-3">

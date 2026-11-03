@@ -1,7 +1,7 @@
 // Supabase 資料列（snake_case）與領域型別（camelCase）之間的轉換
 import type { Database } from '#shared/types/database.types'
 import type {
-  ActivityLevel, DailySummary, Entry, EntryItem, EntryStatus, Goal, MealType, Member, Sex, WeightLog,
+  ActivityLevel, DailySummary, Entry, EntryItem, EntryStatus, Food, FoodPortion, Goal, MealType, Member, Sex, WeightLog,
 } from '#shared/types/domain'
 
 export type MemberInput = Omit<Member, 'id' | 'householdId' | 'archivedAt'>
@@ -48,6 +48,7 @@ export function toEntryItem(row: Tables['entry_items']['Row']): EntryItem {
     carbsG: Number(row.carbs_g),
     fatG: Number(row.fat_g),
     sortOrder: row.sort_order,
+    foodId: row.food_id,
   }
 }
 
@@ -85,5 +86,33 @@ export function toDailySummary(row: Tables['daily_summaries']['Row']): DailySumm
     content: row.content,
     generatedAt: row.generated_at,
     isStale: row.is_stale,
+  }
+}
+
+export function toFood(row: Tables['foods']['Row']): Food {
+  return {
+    id: row.id,
+    householdId: row.household_id,
+    source: row.source as Food['source'],
+    name: row.name,
+    aliases: row.aliases,
+    category: row.category,
+    description: row.description,
+    baseLabel: row.base_label,
+    baseGrams: row.base_grams == null ? null : Number(row.base_grams),
+    kcal: Number(row.kcal),
+    proteinG: Number(row.protein_g),
+    carbsG: Number(row.carbs_g),
+    fatG: Number(row.fat_g),
+  }
+}
+
+export function toFoodPortion(row: Tables['food_portions']['Row']): FoodPortion {
+  return {
+    id: row.id,
+    foodId: row.food_id,
+    householdId: row.household_id,
+    label: row.label,
+    grams: Number(row.grams),
   }
 }

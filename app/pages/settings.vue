@@ -132,6 +132,16 @@ async function signOut() {
       <USelect v-model="defaultMember" :items="defaultMemberItems" placeholder="未設定" class="w-full" />
     </UCard>
 
+    <UCard :ui="{ body: 'p-0 sm:p-0' }">
+      <NuxtLink to="/foods" class="flex items-center justify-between px-4 py-3">
+        <div>
+          <p class="font-medium">我的食物</p>
+          <p class="text-xs text-muted">自訂食物，例如照包裝營養標示建立的常喝飲料</p>
+        </div>
+        <UIcon name="i-lucide-chevron-right" class="size-5 text-dimmed" />
+      </NuxtLink>
+    </UCard>
+
     <UCard>
       <template #header>AI 模型</template>
       <USelect

@@ -37,10 +37,12 @@ export interface Nutrients {
   fatG: number
 }
 
-/** 一個食物品項（AI 辨識結果或使用者編輯中的內容） */
+/** 一個食物品項（AI 辨識結果、從食物庫選的，或使用者編輯中的內容） */
 export interface FoodItem extends Nutrients {
   name: string
   portion: string
+  /** 從食物庫選的品項才有 */
+  foodId?: string | null
 }
 
 export interface EntryItem extends FoodItem {
@@ -77,6 +79,37 @@ export interface DailySummary {
   content: string
   generatedAt: string
   isStale: boolean
+}
+
+/** 食物庫的一項食物（PRD 3.9），營養素以基準份量計 */
+export interface Food extends Nutrients {
+  id: string
+  /** null 表示官方資料 */
+  householdId: string | null
+  source: 'tfda' | 'custom'
+  name: string
+  aliases: string | null
+  category: string | null
+  description: string | null
+  /** 例如「100g」「1 瓶」 */
+  baseLabel: string
+  /** 基準份量的克數，未知時為 null（只能以份數計） */
+  baseGrams: number | null
+}
+
+/** 常用單位，例如「1 碗 = 200g」 */
+export interface FoodPortion {
+  id: string
+  foodId: string
+  householdId: string | null
+  label: string
+  grams: number
+}
+
+/** 成員最近常吃的食物，附上最後一次的份量 */
+export interface RecentFood extends FoodItem {
+  foodId: string
+  times: number
 }
 
 export const MEAL_LABELS: Record<MealType, string> = {

@@ -128,14 +128,15 @@ function percent(value: number, target: number) {
   return target > 0 ? Math.min(100, Math.round((value / target) * 100)) : 0
 }
 
-function newEntry(mode: 'photo' | 'text') {
+function newEntry(mode: 'photo' | 'text' | 'food') {
   if (!currentMember.value) return
   navigateTo({ path: '/entries/new', query: { mode, member: currentMember.value.id, date: date.value } })
 }
 
 const addMenu = [[
   { label: '拍照', icon: 'i-lucide-camera', onSelect: () => newEntry('photo') },
-  { label: '手動輸入', icon: 'i-lucide-pencil', onSelect: () => newEntry('text') },
+  { label: '手動輸入（AI）', icon: 'i-lucide-pencil', onSelect: () => newEntry('text') },
+  { label: '從食物庫選', icon: 'i-lucide-book-open', onSelect: () => newEntry('food') },
 ]]
 </script>
 
